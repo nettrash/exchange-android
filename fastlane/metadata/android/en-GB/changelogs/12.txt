@@ -1,0 +1,6 @@
+Exchange 1.2 — tidy up your recipient list.
+
+• Rename a saved recipient's display label any time — tap it and edit. The key identity behind it never changes.
+• Reorder recipients with a long-press drag, so your most-used contacts sit where you want them.
+• Your names and order ride along in encrypted backups, staying in sync with the iOS and Mac apps.
+• Still no accounts, no servers, no telemetry, no ads.

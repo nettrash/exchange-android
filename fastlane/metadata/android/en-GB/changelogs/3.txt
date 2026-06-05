@@ -1,0 +1,6 @@
+Exchange 1.0 — your messages, your keys, any messenger.
+
+• Type plaintext, pick a recipient, get back a single base64 line. Paste it into Signal, Telegram, WhatsApp, SMS or e-mail — only the recipient can read it, and only your signing key proves it came from you.
+• Swap public keys in person via QR code, or paste the bundle.
+• Identity is held in the Android Keystore, with a passphrase-encrypted backup for device changes.
+• No accounts, no servers, no telemetry, no ads.

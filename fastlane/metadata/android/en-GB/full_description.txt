@@ -1,0 +1,38 @@
+Exchange brings end-to-end encryption to the messenger you already use. Type a message, pick a recipient whose public key you have on file, and Exchange hands back a single base64 line — paste it into Signal, Telegram, WhatsApp, SMS, e-mail, or anything else that carries text. Only your recipient can read it. The signature proves it came from you.
+
+How it works
+- Each message gets a fresh ephemeral X25519 key.
+- ECDH against your recipient's static encryption key, mixed through HKDF-SHA256, derives a per-message wrapping key.
+- A random 32-byte message key is wrapped with ChaCha20-Poly1305 under that key.
+- The plaintext is encrypted with ChaCha20-Poly1305 under the message key.
+- The whole packed envelope is signed with your long-term Ed25519 key.
+- Out comes EXC2:<base64> — one line you can paste anywhere.
+
+On the receiving side Exchange verifies the signature first, then the cheap "is this for me?" recipient fingerprint, then unwraps the message key, then decrypts the body — in that exact order, so a tampered envelope never touches your private key.
+
+Exchanging public keys
+- Show your QR code in person and let the other device scan it.
+- Or copy your public-key bundle as base64 and paste it through any channel you trust.
+- Every key is stamped with an 8-byte fingerprint shown in groups of four hex characters. Verify it out of band before sending anything sensitive.
+
+Backup and device transfer
+- Passphrase backup (EXCBKP1) — exports your identity and recipient list as one encrypted base64 line, derived through 600,000 PBKDF2-HMAC-SHA256 iterations. Save it in a password manager, restore it on the next device.
+- In-person identity QR (EXCQR1) — fast one-shot transfer between two devices you hold. The whole identity is encrypted with a fresh symmetric key embedded in the QR itself; keep the QR visible only to the receiving device.
+
+System integration
+- Share Sheet — Exchange registers as a target for shared text, so a pasted envelope can be sent straight from Signal, Telegram, WhatsApp, or any messenger that supports share-out.
+- App Links — taps on https://exchange.nettrash.me/msg/... links open directly into the decrypted message.
+- Adaptive launcher icon, themed icon on Android 13+, Material 3 dynamic colour.
+
+Private by design
+- 100% on-device. No accounts, no servers, no telemetry, no ads, no trackers.
+- Your identity's private half is stored in the Android Keystore, wrapped under an AES-256/GCM key held in the device's hardware-backed keystore (TEE or StrongBox where supported).
+- Recipients live in a local SQLite database; nothing about them ever leaves the device.
+- The app does not request the INTERNET permission. It makes no outbound calls.
+
+Cross-platform
+Exchange is byte-compatible with the iOS app of the same name. An envelope sealed on iPhone opens on Android and vice versa.
+
+Requires Android 16 (API 36) or later.
+
+Released under the MIT licence at https://github.com/nettrash/exchange-android.
