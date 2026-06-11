@@ -18,12 +18,12 @@ class RecipientRepository(private val dao: RecipientDao) {
     fun observeRecipientsByCreatedAtDesc(): Flow<List<Recipient>> =
         dao.observeAllByCreatedAtDesc()
 
-    /** Recipients in the user's manual drag order — drives the home list. */
+    /**
+     * Recipients in the user's manual drag order — drives both the home
+     * list and the Compose picker.
+     */
     fun observeRecipientsByManualOrder(): Flow<List<Recipient>> =
         dao.observeAllByManualOrder()
-
-    fun observeRecipientsByDisplayName(): Flow<List<Recipient>> =
-        dao.observeAllByDisplayName()
 
     suspend fun listAll(): List<Recipient> = dao.listAll()
 

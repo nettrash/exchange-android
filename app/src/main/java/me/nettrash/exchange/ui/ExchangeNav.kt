@@ -12,6 +12,7 @@
 
 package me.nettrash.exchange.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -24,10 +25,13 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import me.nettrash.exchange.ui.screens.AddRecipientScreen
 import me.nettrash.exchange.ui.screens.ComposeScreen
+import me.nettrash.exchange.ui.screens.DecryptFileScreen
 import me.nettrash.exchange.ui.screens.DecryptScreen
+import me.nettrash.exchange.ui.screens.EncryptFileScreen
 import me.nettrash.exchange.ui.screens.ExportIdentityScreen
 import me.nettrash.exchange.ui.screens.HomeScreen
 import me.nettrash.exchange.ui.screens.ImportIdentityScreen
+import me.nettrash.exchange.ui.screens.LockScreen
 import me.nettrash.exchange.ui.screens.MyIdentityQrScreen
 import me.nettrash.exchange.ui.screens.ScanIdentityQrTransferScreen
 import me.nettrash.exchange.ui.screens.SettingsScreen
@@ -38,6 +42,8 @@ object Routes {
     const val HOME = "home"
     const val COMPOSE = "compose"
     const val DECRYPT = "decrypt"
+    const val ENCRYPT_FILE = "encryptFile"
+    const val DECRYPT_FILE = "decryptFile"
     const val ADD_RECIPIENT = "addRecipient"
     const val MY_IDENTITY_QR = "myIdentityQR"
     const val SETTINGS = "settings"
@@ -49,11 +55,16 @@ object Routes {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ExchangeApp(viewModel: ExchangeViewModel = viewModel()) {
+fun ExchangeApp(
+    viewModel: ExchangeViewModel = viewModel(),
+    onRequestUnlock: () -> Unit = {},
+) {
     val navController = rememberNavController()
     val identityState by viewModel.identityState.collectAsState()
     val pendingEnvelope by viewModel.pendingDecryptEnvelope.collectAsState()
+    val isLocked by viewModel.isLocked.collectAsState()
 
+    Box {
     // A pending envelope (from a share / deep link) skips straight to
     // Decrypt the moment the identity is loaded.
     when (val state = identityState) {
@@ -76,6 +87,8 @@ fun ExchangeApp(viewModel: ExchangeViewModel = viewModel()) {
                         onAddRecipient = { navController.navigate(Routes.ADD_RECIPIENT) },
                         onShowMyQr = { navController.navigate(Routes.MY_IDENTITY_QR) },
                         onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                        onEncryptFile = { navController.navigate(Routes.ENCRYPT_FILE) },
+                        onDecryptFile = { navController.navigate(Routes.DECRYPT_FILE) },
                     )
                 }
                 composable(Routes.COMPOSE) {
@@ -97,6 +110,18 @@ fun ExchangeApp(viewModel: ExchangeViewModel = viewModel()) {
                                 navController.popBackStack()
                             }
                         },
+                    )
+                }
+                composable(Routes.ENCRYPT_FILE) {
+                    EncryptFileScreen(
+                        viewModel = viewModel,
+                        onClose = { navController.popBackStack() },
+                    )
+                }
+                composable(Routes.DECRYPT_FILE) {
+                    DecryptFileScreen(
+                        viewModel = viewModel,
+                        onClose = { navController.popBackStack() },
                     )
                 }
                 composable(Routes.ADD_RECIPIENT) {
@@ -146,6 +171,13 @@ fun ExchangeApp(viewModel: ExchangeViewModel = viewModel()) {
                     )
                 }
             }
+        }
+    }
+
+        // Lock overlay sits on top of whatever is showing, preserving the
+        // nav stack underneath while the app is locked.
+        if (isLocked) {
+            LockScreen(onUnlock = onRequestUnlock)
         }
     }
 }

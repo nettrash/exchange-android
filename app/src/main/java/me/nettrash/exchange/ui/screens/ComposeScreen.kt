@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -47,6 +48,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -64,6 +68,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import me.nettrash.exchange.crypto.EnvelopeUrl
+import me.nettrash.exchange.data.MessageShareFormat
 import me.nettrash.exchange.data.Recipient
 import me.nettrash.exchange.ui.ExchangeViewModel
 import me.nettrash.exchange.ui.components.copyToClipboard
@@ -78,7 +83,9 @@ fun ComposeScreen(
     val context = LocalContext.current
     val identityState by viewModel.identityState.collectAsState()
     val identity = (identityState as? ExchangeViewModel.IdentityState.Loaded)?.identity ?: return
-    val recipients by viewModel.recipientsByName.collectAsState()
+    // Same order as the home screen (manual drag-order, then newest-first),
+    // rather than alphabetical, so the picker matches the main list.
+    val recipients by viewModel.recipientsByManualOrder.collectAsState()
     val coroutineScope = rememberCoroutineScope()
 
     var selectedRecipient by remember { mutableStateOf<Recipient?>(null) }
@@ -86,9 +93,16 @@ fun ComposeScreen(
     var envelope by remember { mutableStateOf<String?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var pickerOpen by remember { mutableStateOf(false) }
+    // Preferred share representation (link vs raw EXC2), persisted.
+    var shareFormat by remember { mutableStateOf(viewModel.composeShareFormat) }
 
+    // Pre-select the recipient last composed to if they still exist,
+    // otherwise the first row.
     LaunchedEffect(recipients) {
-        if (selectedRecipient == null) selectedRecipient = recipients.firstOrNull()
+        if (selectedRecipient == null && recipients.isNotEmpty()) {
+            val lastId = viewModel.lastRecipientId
+            selectedRecipient = recipients.firstOrNull { it.id == lastId } ?: recipients.firstOrNull()
+        }
     }
 
     Scaffold(
@@ -107,6 +121,10 @@ fun ComposeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                // Inset for the soft keyboard so the scroll area ends above
+                // it — otherwise the "Encrypt & sign" button is hidden
+                // behind the keyboard while typing the message.
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -146,6 +164,7 @@ fun ComposeScreen(
                                 },
                                 onClick = {
                                     selectedRecipient = r
+                                    viewModel.rememberLastRecipient(r.id)
                                     pickerOpen = false
                                 },
                             )
@@ -204,9 +223,30 @@ fun ComposeScreen(
                 }
             } else {
                 val url = EnvelopeUrl.urlFor(currentEnvelope)
-                val shareable = url ?: currentEnvelope
+                val usingLink = shareFormat == MessageShareFormat.LINK && url != null
+                val shareable = if (usingLink) url else currentEnvelope
+
+                Text("Format", style = MaterialTheme.typography.labelMedium)
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        selected = shareFormat == MessageShareFormat.LINK,
+                        onClick = {
+                            shareFormat = MessageShareFormat.LINK
+                            viewModel.setComposeShareFormat(MessageShareFormat.LINK)
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    ) { Text("Link") }
+                    SegmentedButton(
+                        selected = shareFormat == MessageShareFormat.ENVELOPE,
+                        onClick = {
+                            shareFormat = MessageShareFormat.ENVELOPE
+                            viewModel.setComposeShareFormat(MessageShareFormat.ENVELOPE)
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    ) { Text("EXC2") }
+                }
                 Text(
-                    if (url == null) "Encrypted envelope" else "Encrypted message link",
+                    if (usingLink) "Encrypted message link" else "Encrypted envelope (EXC2)",
                     style = MaterialTheme.typography.labelMedium,
                 )
                 Card(

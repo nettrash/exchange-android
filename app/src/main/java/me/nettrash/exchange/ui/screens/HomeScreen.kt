@@ -19,6 +19,7 @@ package me.nettrash.exchange.ui.screens
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -39,12 +40,15 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -90,6 +94,8 @@ fun HomeScreen(
     onAddRecipient: () -> Unit,
     onShowMyQr: () -> Unit,
     onOpenSettings: () -> Unit,
+    onEncryptFile: () -> Unit,
+    onDecryptFile: () -> Unit,
 ) {
     val identityState by viewModel.identityState.collectAsState()
     val identity =
@@ -106,6 +112,9 @@ fun HomeScreen(
 
     // The recipient currently being renamed, if any.
     var renaming by remember { mutableStateOf<Recipient?>(null) }
+
+    // Overflow menu (file encrypt/decrypt).
+    var fileMenuOpen by remember { mutableStateOf(false) }
 
     val listState = rememberLazyListState()
     val dragDropState = rememberDragDropState(
@@ -141,6 +150,21 @@ fun HomeScreen(
                     }
                     IconButton(onClick = onAddRecipient) {
                         Icon(Icons.Default.PersonAdd, contentDescription = "Add recipient")
+                    }
+                    Box {
+                        IconButton(onClick = { fileMenuOpen = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "More")
+                        }
+                        DropdownMenu(expanded = fileMenuOpen, onDismissRequest = { fileMenuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Encrypt file") },
+                                onClick = { fileMenuOpen = false; onEncryptFile() },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Decrypt file") },
+                                onClick = { fileMenuOpen = false; onDecryptFile() },
+                            )
+                        }
                     }
                 },
             )

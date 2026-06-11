@@ -13,7 +13,9 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.provider.OpenableColumns
 import android.widget.Toast
 
 fun Context.copyToClipboard(label: String, value: String) {
@@ -34,4 +36,25 @@ fun Context.shareText(text: String, chooserTitle: String = "Share via") {
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
     startActivity(chooser)
+}
+
+// ---- Storage Access Framework helpers (run off the main thread) ----------
+
+/** Read all bytes from a content Uri, or null if it can't be opened. */
+fun Context.readAllBytes(uri: Uri): ByteArray? =
+    contentResolver.openInputStream(uri)?.use { it.readBytes() }
+
+/** Write bytes to a content Uri. Returns true on success. */
+fun Context.writeAllBytes(uri: Uri, bytes: ByteArray): Boolean =
+    contentResolver.openOutputStream(uri)?.use { it.write(bytes); true } ?: false
+
+/** Best-effort display name for a content Uri, falling back to [fallback]. */
+fun Context.displayName(uri: Uri, fallback: String = "file"): String {
+    contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+        if (c.moveToFirst()) {
+            val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (idx >= 0) c.getString(idx)?.let { return it }
+        }
+    }
+    return fallback
 }

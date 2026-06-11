@@ -50,7 +50,7 @@ val storedVersionCode: Int = run {
 }
 
 val resolvedVersionName: String =
-    (project.findProperty("versionName") as String?)?.takeIf { it.isNotBlank() } ?: "1.2"
+    (project.findProperty("versionName") as String?)?.takeIf { it.isNotBlank() } ?: "1.3"
 
 // Allow opting out of the bump for a single build, e.g. when running a
 // throwaway test or when CI does not want the local file mutated:
@@ -221,6 +221,8 @@ dependencies {
     implementation(libs.material)
 
     implementation(libs.bouncycastle.bcprov)
+
+    implementation(libs.androidx.biometric)
 
     implementation(libs.zxing.core)
 

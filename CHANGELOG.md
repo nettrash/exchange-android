@@ -7,6 +7,47 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 User-facing Play Store release notes live in
 `fastlane/metadata/android/en-GB/changelogs/<versionCode>.txt`.
 
+## [1.3] — 2026-06-10 (versionCode 22)
+
+### Added
+- **Compose remembers your last recipient.** Picking someone in Compose is
+  remembered, so the next time you compose they're pre-selected instead of
+  the list resetting to the top.
+- **Decrypt a shared message link.** Decrypt now accepts a
+  `https://exchange.nettrash.me/msg…` link, not just the raw `EXC2:` envelope:
+  paste either form (or pull it from the clipboard) and Exchange extracts the
+  envelope before decrypting. Tapping such a link, or sharing it to Exchange,
+  already opened the app and decrypted it.
+- **Choose how you share a sealed message.** The Compose result screen has a
+  Link / EXC2 toggle: share the rich `exchange.nettrash.me/msg` link
+  (default) or the raw `EXC2:` envelope for plain-text channels. Your choice
+  is remembered.
+- **App lock.** An optional biometric lock — turn on “Require biometric
+  unlock” in Settings and Exchange asks for your fingerprint / face (or your
+  device PIN / pattern / password as a fallback) before opening. Two
+  settings make it configurable:
+  - **Re-lock** — how long the app can be in the background before it locks
+    again: Immediately, after 1 / 5 / 15 minutes, or only on launch.
+  - **Also lock message links** — extends the lock to opening a shared
+    message link, not just the main app.
+  It's a convenience lock; your keys stay protected by the Android Keystore
+  either way, and if the device has no biometric or screen lock enrolled the
+  lock fails open so you can't be shut out of your own identity.
+- **Encrypt & decrypt files.** New "Encrypt file" / "Decrypt file" actions
+  (the ⋮ menu on the home screen) seal any file — its name and bytes — to a
+  recipient as a shareable `.exc2` file, signed by you. The recipient opens
+  Decrypt file, picks it, and gets the original back. Same envelope format as
+  messages, so it interoperates across Android, iOS and macOS.
+
+### Changed
+- The Compose recipient picker now lists recipients in the **same order as
+  the home screen** — your manual drag-order first, then newest-first for the
+  rest — instead of alphabetically.
+
+### Fixed
+- The Compose **Encrypt & sign** button is no longer hidden behind the
+  soft keyboard while typing a message.
+
 ## [1.2] — 2026-06-05 (versionCode 12)
 
 ### Added

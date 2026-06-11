@@ -32,10 +32,6 @@ interface RecipientDao {
     @Query("SELECT * FROM recipients ORDER BY order_index ASC, created_at DESC")
     fun observeAllByManualOrder(): Flow<List<Recipient>>
 
-    /** All recipients, sorted by display name — matches the picker ordering. */
-    @Query("SELECT * FROM recipients ORDER BY display_name COLLATE NOCASE ASC")
-    fun observeAllByDisplayName(): Flow<List<Recipient>>
-
     /** Smallest order_index currently in use (null if the table is empty). */
     @Query("SELECT MIN(order_index) FROM recipients")
     suspend fun minOrderIndex(): Int?

@@ -24,6 +24,7 @@ import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -44,11 +45,14 @@ import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -68,6 +72,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import me.nettrash.exchange.AppConstants
 import me.nettrash.exchange.crypto.toGroupedHex
+import me.nettrash.exchange.data.AppLockTimeout
 import me.nettrash.exchange.ui.ExchangeViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -85,6 +90,10 @@ fun SettingsScreen(
     val identity =
         (identityState as? ExchangeViewModel.IdentityState.Loaded)?.identity ?: return
     var resetDialogOpen by remember { mutableStateOf(false) }
+    var lockEnabled by remember { mutableStateOf(viewModel.appLockEnabled) }
+    var lockTimeout by remember { mutableStateOf(viewModel.appLockTimeout) }
+    var lockCoversIncoming by remember { mutableStateOf(viewModel.appLockCoversIncoming) }
+    var timeoutMenuOpen by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val versionName = remember {
         try {
@@ -120,6 +129,65 @@ fun SettingsScreen(
                 SectionCard {
                     KeyValueRow("Fingerprint", identity.fingerprint.toGroupedHex())
                 }
+            }
+
+            item {
+                SectionHeader("App lock")
+                SectionCard {
+                    SwitchRow(
+                        label = "Require biometric unlock",
+                        checked = lockEnabled,
+                        onCheckedChange = {
+                            lockEnabled = it
+                            viewModel.setAppLockEnabled(it)
+                        },
+                    )
+                    if (lockEnabled) {
+                        Box {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { timeoutMenuOpen = true }
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text("Re-lock", modifier = Modifier.weight(1f))
+                                Text(
+                                    lockTimeout.label,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = timeoutMenuOpen,
+                                onDismissRequest = { timeoutMenuOpen = false },
+                            ) {
+                                AppLockTimeout.entries.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = { Text(option.label) },
+                                        onClick = {
+                                            lockTimeout = option
+                                            viewModel.setAppLockTimeout(option)
+                                            timeoutMenuOpen = false
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                        SwitchRow(
+                            label = "Also lock message links",
+                            checked = lockCoversIncoming,
+                            onCheckedChange = {
+                                lockCoversIncoming = it
+                                viewModel.setAppLockCoversIncoming(it)
+                            },
+                        )
+                    }
+                }
+                Text(
+                    "When on, Exchange asks for your fingerprint, face, or device PIN before opening. “Re-lock” sets how long the app can be in the background before it locks again. “Also lock message links” extends the lock to opening a shared message link, not just the app. This is a convenience lock; your keys stay protected by the system keystore regardless.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             item {
@@ -270,6 +338,23 @@ private fun KeyValueRow(label: String, value: String) {
             style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+@Composable
+private fun SwitchRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, modifier = Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 

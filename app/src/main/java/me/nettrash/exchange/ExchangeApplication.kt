@@ -18,6 +18,7 @@
 package me.nettrash.exchange
 
 import android.app.Application
+import me.nettrash.exchange.data.AppPreferences
 import me.nettrash.exchange.data.ExchangeDatabase
 import me.nettrash.exchange.data.IdentityStore
 import me.nettrash.exchange.data.RecipientRepository
@@ -31,4 +32,6 @@ class ExchangeApplication : Application() {
     val recipientRepository: RecipientRepository by lazy {
         RecipientRepository(database.recipientDao())
     }
+
+    val appPreferences: AppPreferences by lazy { AppPreferences(this) }
 }
