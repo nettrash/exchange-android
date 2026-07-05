@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -40,6 +41,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,10 +54,13 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import me.nettrash.exchange.crypto.ShareClassifier
 import me.nettrash.exchange.crypto.toGroupedHex
 import me.nettrash.exchange.ui.ExchangeViewModel
 import me.nettrash.exchange.ui.components.readAllBytes
+import me.nettrash.exchange.ui.components.shareFile
 import me.nettrash.exchange.ui.components.writeAllBytes
+import me.nettrash.exchange.ui.components.writeToShareCache
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,6 +77,30 @@ fun DecryptFileScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var result by remember { mutableStateOf<ExchangeViewModel.FileDecryptResult?>(null) }
     var saved by remember { mutableStateOf(false) }
+
+    // Opened from a share/VIEW intent: an encrypted file was handed in. Read it
+    // from the ViewModel flow (not a one-shot snapshot) so it survives rotation,
+    // and auto-decrypt instead of showing the picker. Cleared only when the user
+    // leaves (Close / "Decrypt another file").
+    val pendingShared by viewModel.pendingSharedFile.collectAsState()
+    val incoming = pendingShared?.takeIf { it.kind == ShareClassifier.Kind.DECRYPT }
+    LaunchedEffect(Unit) {
+        // Runs once per composition; after a rotation the recreated composition
+        // re-runs it and (since `result` was lost) re-decrypts, restoring it.
+        val f = incoming
+        if (f != null && result == null) {
+            working = true
+            errorMessage = null
+            val r = viewModel.decryptFile(f.bytes.toString(Charsets.UTF_8), identity)
+            if (r is ExchangeViewModel.FileDecryptResult.Failed) {
+                errorMessage = r.message
+                result = null
+            } else {
+                result = r
+            }
+            working = false
+        }
+    }
 
     val saveLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream")
@@ -162,7 +191,21 @@ fun DecryptFileScreen(
                         Spacer8()
                         Text("Save file…")
                     }
-                    OutlinedButton(onClick = { result = null; saved = false }, modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = {
+                            val uri = context.writeToShareCache(r.filename, r.content)
+                            context.shareFile(uri)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = null)
+                        Spacer8()
+                        Text("Share file…")
+                    }
+                    OutlinedButton(
+                        onClick = { result = null; saved = false; viewModel.clearPendingSharedFile() },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
                         Text("Decrypt another file")
                     }
                 }
@@ -186,7 +229,10 @@ fun DecryptFileScreen(
                         }
                     }
                     SenderFooter(r.senderDisplayName, r.senderSigningKeyFingerprint)
-                    OutlinedButton(onClick = { result = null }, modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = { result = null; viewModel.clearPendingSharedFile() },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
                         Text("Decrypt another file")
                     }
                 }

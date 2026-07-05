@@ -1,0 +1,8 @@
+Exchange 1.4 — share any file to encrypt or decrypt it.
+
+• Exchange now appears in the share sheet for any file, image, link or text — and opens .exc2 files from your file manager.
+• Share something to Exchange and it decides: if it's ours (a .exc2 file, an EXC2: envelope, or an exchange.nettrash.me/msg link) it decrypts and restores the original; anything else it encrypts to a recipient you pick.
+• A shared identity backup or transfer is recognised and pointed at Settings → Import, instead of being encrypted.
+• Encrypted and decrypted results now have a Share button, not just Save.
+• Same envelope format — files interoperate across Android, iOS and macOS.
+• Still no accounts, no servers, no telemetry, no ads.

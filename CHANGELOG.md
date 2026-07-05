@@ -7,6 +7,21 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 User-facing Play Store release notes live in
 `fastlane/metadata/android/en-GB/changelogs/<versionCode>.txt`.
 
+## [1.4] — 2026-07-04 (versionCode 24)
+
+### Added
+- **Share any file to Exchange to encrypt or decrypt it.** Exchange now shows
+  up in the Android share sheet for any file (share `*/*`), and also opens
+  `.exc2` files from a file manager. Share something to Exchange and it works
+  out what to do: if it's one of ours — a `.exc2` file, an `EXC2:` envelope, or
+  an `exchange.nettrash.me/msg` link — it opens **Decrypt** and restores the
+  original; anything else opens **Encrypt**, where you pick a recipient and get
+  back a sealed `.exc2` to save or share. A shared identity backup / transfer
+  is recognised and pointed at Settings → Import instead of being encrypted.
+  The decrypted/encrypted result now also has a **Share** button (via a
+  FileProvider), not just Save. Same envelope format, so files interoperate
+  across Android, iOS and macOS.
+
 ## [1.3] — 2026-06-10 (versionCode 22)
 
 ### Added

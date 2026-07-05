@@ -36,6 +36,33 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
 
+            <!-- Receive ANY shared file: Exchange auto-detects whether it's an
+                 encrypted .exc2 (decrypt) or foreign content (encrypt for a
+                 chosen recipient). The mimeType "*/*" makes Exchange appear in
+                 the share sheet for every file type; classification is by the
+                 bytes, not the extension (see ShareClassifier). -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+
+            <!-- Open a .exc2 file from a file manager / downloads. .exc2 has no
+                 registered MIME, so DocumentsUI reports application/octet-stream;
+                 detection still happens by sniffing the bytes. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" android:mimeType="application/octet-stream" />
+                <data android:scheme="file" android:mimeType="application/octet-stream" />
+            </intent-filter>
+
             <!-- Deep links: https://exchange.nettrash.me/msg?p=... (cross-platform). -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
@@ -55,6 +82,18 @@
                 <data android:scheme="exc2" />
             </intent-filter>
         </activity>
+
+        <!-- Shares the encrypted/decrypted OUTPUT file back out (Share… button).
+             Exposes only cache/shared/ (see res/xml/file_provider_paths.xml). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_provider_paths" />
+        </provider>
     </application>
 
 </manifest>

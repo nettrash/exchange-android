@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -58,11 +59,14 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import me.nettrash.exchange.crypto.ShareClassifier
 import me.nettrash.exchange.data.Recipient
 import me.nettrash.exchange.ui.ExchangeViewModel
 import me.nettrash.exchange.ui.components.displayName
 import me.nettrash.exchange.ui.components.readAllBytes
+import me.nettrash.exchange.ui.components.shareFile
 import me.nettrash.exchange.ui.components.writeAllBytes
+import me.nettrash.exchange.ui.components.writeToShareCache
 
 private const val WARN_SIZE_BYTES = 20 * 1024 * 1024
 
@@ -86,6 +90,13 @@ fun EncryptFileScreen(
     var envelope by remember { mutableStateOf<String?>(null) }
     var encryptedSize by remember { mutableStateOf(0) }
     var saved by remember { mutableStateOf(false) }
+
+    // Opened from a share intent: a foreign file was handed in to encrypt.
+    // Read it from the ViewModel flow (not a one-shot snapshot) so it survives
+    // configuration changes like rotation; it's cleared only when the user
+    // explicitly leaves the flow (Close / "Encrypt another file").
+    val pendingShared by viewModel.pendingSharedFile.collectAsState()
+    val incoming = pendingShared?.takeIf { it.kind == ShareClassifier.Kind.ENCRYPT }
 
     LaunchedEffect(recipients) {
         if (selectedRecipient == null && recipients.isNotEmpty()) {
@@ -197,18 +208,67 @@ fun EncryptFileScreen(
 
                 errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
-                Button(
-                    onClick = { pickLauncher.launch(arrayOf("*/*")) },
-                    enabled = selectedRecipient != null && !working,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    if (working) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    } else {
-                        Icon(Icons.Default.Lock, contentDescription = null)
+                val inc = incoming
+                if (inc != null) {
+                    // Shared-in file: show what we're about to seal, then let
+                    // the user pick a recipient and encrypt it directly.
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("File to encrypt: ${inc.name}", style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                Formatter.formatShortFileSize(context, inc.bytes.size.toLong()),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
-                    Spacer(Modifier.size(8.dp))
-                    Text("Choose file to encrypt…")
+                    Button(
+                        onClick = {
+                            val recipient = selectedRecipient ?: return@Button
+                            working = true
+                            errorMessage = null
+                            scope.launch {
+                                when (val r = viewModel.encryptFile(inc.bytes, inc.name, recipient, identity)) {
+                                    is ExchangeViewModel.EncryptResult.Sealed -> {
+                                        envelope = r.envelope
+                                        sourceName = inc.name
+                                        encryptedSize = r.envelope.toByteArray(Charsets.UTF_8).size
+                                        saved = false
+                                    }
+                                    is ExchangeViewModel.EncryptResult.Failed -> errorMessage = r.message
+                                }
+                                working = false
+                            }
+                        },
+                        enabled = selectedRecipient != null && !working,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (working) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Lock, contentDescription = null)
+                        }
+                        Spacer(Modifier.size(8.dp))
+                        Text("Encrypt for ${selectedRecipient?.displayName ?: "recipient"}")
+                    }
+                } else {
+                    Button(
+                        onClick = { pickLauncher.launch(arrayOf("*/*")) },
+                        enabled = selectedRecipient != null && !working,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (working) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Lock, contentDescription = null)
+                        }
+                        Spacer(Modifier.size(8.dp))
+                        Text("Choose file to encrypt…")
+                    }
                 }
                 Text(
                     "The file is encrypted to ${selectedRecipient?.displayName ?: "your recipient"} and signed by you, then saved as an .exc2 file you can send through any app. Only they can open it.",
@@ -258,10 +318,25 @@ fun EncryptFileScreen(
                 }
                 OutlinedButton(
                     onClick = {
+                        val env2 = envelope ?: return@OutlinedButton
+                        val base = (sourceName ?: "file").substringBeforeLast('.').ifEmpty { "file" }
+                        val uri = context.writeToShareCache("$base.exc2", env2.toByteArray(Charsets.UTF_8))
+                        context.shareFile(uri)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null)
+                    Spacer(Modifier.size(8.dp))
+                    Text("Share encrypted file…")
+                }
+                OutlinedButton(
+                    onClick = {
                         envelope = null
                         sourceName = null
                         errorMessage = null
                         saved = false
+                        // Drop the shared-in file so this returns to the picker.
+                        viewModel.clearPendingSharedFile()
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Encrypt another file") }

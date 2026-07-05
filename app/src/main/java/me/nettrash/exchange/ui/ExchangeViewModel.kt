@@ -18,6 +18,7 @@
 package me.nettrash.exchange.ui
 
 import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -35,9 +36,12 @@ import me.nettrash.exchange.crypto.FilePayload
 import me.nettrash.exchange.crypto.Identity
 import me.nettrash.exchange.crypto.IdentityBackup
 import me.nettrash.exchange.crypto.IdentityTransferQR
+import me.nettrash.exchange.crypto.ShareClassifier
 import me.nettrash.exchange.data.AppLockTimeout
 import me.nettrash.exchange.data.MessageShareFormat
 import me.nettrash.exchange.data.Recipient
+import me.nettrash.exchange.ui.components.displayName
+import me.nettrash.exchange.ui.components.readAllBytes
 
 class ExchangeViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -95,6 +99,65 @@ class ExchangeViewModel(app: Application) : AndroidViewModel(app) {
      */
     private val _pendingDecryptEnvelope = MutableStateFlow<String?>(null)
     val pendingDecryptEnvelope: StateFlow<String?> = _pendingDecryptEnvelope.asStateFlow()
+
+    // ---- Incoming shared FILE (share any file → encrypt/decrypt) ---------
+
+    /**
+     * An arbitrary file shared into Exchange (ACTION_SEND stream / ACTION_VIEW
+     * of a content Uri), already read + classified. [kind] tells the nav which
+     * screen to open: DECRYPT (it's ours) → DecryptFileScreen; ENCRYPT (foreign)
+     * → EncryptFileScreen with the recipient picker. IDENTITY_MATERIAL never
+     * reaches here — it surfaces via [pendingNote] instead.
+     */
+    class PendingSharedFile(
+        val bytes: ByteArray,
+        val name: String,
+        val kind: ShareClassifier.Kind,
+    )
+
+    private val _pendingSharedFile = MutableStateFlow<PendingSharedFile?>(null)
+    val pendingSharedFile: StateFlow<PendingSharedFile?> = _pendingSharedFile.asStateFlow()
+
+    /** One-shot user note (shown as a toast), e.g. when a shared file is an
+     *  identity backup/transfer that belongs in the Import flow, not here. */
+    private val _pendingNote = MutableStateFlow<String?>(null)
+    val pendingNote: StateFlow<String?> = _pendingNote.asStateFlow()
+
+    /**
+     * Read the shared [uri]'s bytes off the main thread, classify them, and
+     * route: our envelopes → decrypt, foreign files → encrypt for a recipient,
+     * identity backups/transfers → a note pointing at Settings. No-op if the
+     * Uri can't be read.
+     */
+    fun acceptIncomingFile(uri: Uri) {
+        viewModelScope.launch {
+            val ctx = getApplication<Application>()
+            val bytes = withContext(Dispatchers.IO) { ctx.readAllBytes(uri) }
+            if (bytes == null || bytes.isEmpty()) {
+                _pendingNote.value = "Couldn't read that shared file."
+                return@launch
+            }
+            val name = withContext(Dispatchers.IO) { ctx.displayName(uri) }
+            when (ShareClassifier.classify(bytes)) {
+                ShareClassifier.Kind.IDENTITY_MATERIAL -> {
+                    _pendingNote.value =
+                        "This looks like an Exchange identity backup or transfer. Import it from Settings → Import identity."
+                    return@launch
+                }
+                ShareClassifier.Kind.DECRYPT ->
+                    _pendingSharedFile.value = PendingSharedFile(bytes, name, ShareClassifier.Kind.DECRYPT)
+                ShareClassifier.Kind.ENCRYPT ->
+                    _pendingSharedFile.value = PendingSharedFile(bytes, name, ShareClassifier.Kind.ENCRYPT)
+            }
+            // Mirror acceptIncomingText: let a shared file through the lock
+            // unless the user chose to cover incoming content.
+            if (!appPreferences.appLockCoversIncoming) _isLocked.value = false
+        }
+    }
+
+    fun clearPendingSharedFile() { _pendingSharedFile.value = null }
+
+    fun clearPendingNote() { _pendingNote.value = null }
 
     // ---- App lock -------------------------------------------------------
     // A UI gate only; identity keys stay protected by the Keystore.

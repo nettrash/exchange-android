@@ -17,6 +17,8 @@ import android.net.Uri
 import android.os.Build
 import android.provider.OpenableColumns
 import android.widget.Toast
+import androidx.core.content.FileProvider
+import java.io.File
 
 fun Context.copyToClipboard(label: String, value: String) {
     val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -57,4 +59,35 @@ fun Context.displayName(uri: Uri, fallback: String = "file"): String {
         }
     }
     return fallback
+}
+
+// ---- Share a produced file back out (FileProvider) ------------------------
+
+/**
+ * Stage [bytes] under [filename] in cache/shared/ and return a content Uri
+ * a receiving app can read via our FileProvider. The directory is the only
+ * one exposed in file_provider_paths.xml.
+ */
+fun Context.writeToShareCache(filename: String, bytes: ByteArray): Uri {
+    val dir = File(cacheDir, "shared").apply { mkdirs() }
+    val safeName = filename.substringAfterLast('/').ifBlank { "file" }
+    val target = File(dir, safeName)
+    target.writeBytes(bytes)
+    return FileProvider.getUriForFile(this, "$packageName.fileprovider", target)
+}
+
+/**
+ * Fire the system share sheet for a file [uri] (from [writeToShareCache]),
+ * granting the receiver a transient read permission. Mirrors [shareText].
+ */
+fun Context.shareFile(uri: Uri, mime: String = "application/octet-stream", chooserTitle: String = "Share via") {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = mime
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    val chooser = Intent.createChooser(intent, chooserTitle).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    startActivity(chooser)
 }

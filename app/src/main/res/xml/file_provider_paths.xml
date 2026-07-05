@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!--
+        Subset of the app-internal cache that's allowed out via FileProvider.
+        The Share… buttons write the encrypted .exc2 / restored file into
+        cache/shared/ specifically, so the rest of the cache stays opaque to
+        the apps we hand a content:// Uri to.
+    -->
+    <cache-path name="shared" path="shared/" />
+</paths>

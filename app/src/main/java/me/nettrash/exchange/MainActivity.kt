@@ -20,7 +20,9 @@ package me.nettrash.exchange
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Parcelable
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -97,6 +99,8 @@ class MainActivity : FragmentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        // Keep getIntent() consistent for any later reads (singleTask warm start).
+        setIntent(intent)
         consumeIncomingIntent(intent)
     }
 
@@ -134,21 +138,42 @@ class MainActivity : FragmentActivity() {
     // ---- Incoming intents ----------------------------------------------
 
     /**
-     * Pull an EXC2 envelope (or a `exchange.nettrash.me/msg` URL, or a
-     * `exc2://` URI) out of the supplied intent, normalise it, and hand
-     * it to the ViewModel. No-op for intents that don't carry one.
+     * Route an incoming intent to the ViewModel:
+     *   - a shared TEXT envelope / deep link / exc2: URI → acceptIncomingText
+     *   - a shared FILE (SEND stream, SEND_MULTIPLE, or ACTION_VIEW of a
+     *     content/file Uri) → acceptIncomingFile, which auto-detects whether
+     *     it's ours (decrypt) or foreign (encrypt for a chosen recipient).
+     * No-op for intents that carry neither.
      */
     private fun consumeIncomingIntent(intent: Intent?) {
         if (intent == null) return
-        val payload: String? = when (intent.action) {
-            Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)
-            Intent.ACTION_VIEW -> intent.data?.let { uri ->
-                EnvelopeUrl.extract(uri.toString())
-                    ?: extractFromExc2Scheme(uri)
+        when (intent.action) {
+            Intent.ACTION_SEND -> {
+                val text = intent.getStringExtra(Intent.EXTRA_TEXT)
+                if (!text.isNullOrBlank()) {
+                    viewModel.acceptIncomingText(text)
+                } else {
+                    intent.getParcelableExtraCompat<Uri>(Intent.EXTRA_STREAM)
+                        ?.let { viewModel.acceptIncomingFile(it) }
+                }
             }
-            else -> null
+            Intent.ACTION_SEND_MULTIPLE -> {
+                // v1 handles the first shared file; batch encryption is a
+                // future enhancement.
+                intent.getParcelableArrayListExtraCompat<Uri>(Intent.EXTRA_STREAM)
+                    ?.firstOrNull()
+                    ?.let { viewModel.acceptIncomingFile(it) }
+            }
+            Intent.ACTION_VIEW -> {
+                val uri = intent.data ?: return
+                val envelope = EnvelopeUrl.extract(uri.toString()) ?: extractFromExc2Scheme(uri)
+                when {
+                    envelope != null -> viewModel.acceptIncomingText(envelope)
+                    uri.scheme == "content" || uri.scheme == "file" ->
+                        viewModel.acceptIncomingFile(uri)
+                }
+            }
         }
-        viewModel.acceptIncomingText(payload)
     }
 
     /**
@@ -160,5 +185,26 @@ class MainActivity : FragmentActivity() {
         val body = uri.lastPathSegment ?: uri.schemeSpecificPart?.trimStart('/')
         if (body.isNullOrBlank()) return null
         return "EXC2:" + body.trim()
+    }
+
+    /**
+     * Tiramisu-safe Parcelable extra: the typed API can return null for some
+     * share sources (Google Photos wraps EXTRA_STREAM so the strict
+     * isInstance check fails), so fall back to the deprecated untyped cast.
+     */
+    private inline fun <reified T : Parcelable> Intent.getParcelableExtraCompat(name: String): T? {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            getParcelableExtra(name, T::class.java)?.let { return it }
+        }
+        @Suppress("DEPRECATION")
+        return getParcelableExtra(name) as? T
+    }
+
+    private inline fun <reified T : Parcelable> Intent.getParcelableArrayListExtraCompat(name: String): ArrayList<T>? {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            getParcelableArrayListExtra(name, T::class.java)?.let { return it }
+        }
+        @Suppress("DEPRECATION")
+        return getParcelableArrayListExtra(name)
     }
 }
